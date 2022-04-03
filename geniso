@@ -1,0 +1,79 @@
+#!/bin/bash
+
+set -ue
+
+HOSTNAME=$1
+FQDN=$2
+OUTPUT=$3
+
+ISO_URL=$(curl https://builds.coreos.fedoraproject.org/streams/stable.json | jq -r .architectures.x86_64.artifacts.metal.formats.iso.disk.location)
+ISO_FILENAME=$(basename $ISO_URL)
+
+test -f $ISO_FILENAME || wget $ISO_URL
+
+function coreos-installer() {
+    docker run -it --rm -v $(pwd):/work -w /work --pull=always -u $(id -u):$(id -g) quay.io/coreos/coreos-installer:release "$@"
+}
+
+function butane() {
+    docker run -it --rm -v $(pwd):/work -w /work --pull=always -u $(id -u):$(id -g) quay.io/coreos/butane:release "$@"
+}
+
+BUTANE_PATH=$(mktemp -p .)
+
+cat >$BUTANE_PATH <<EOF
+variant: fcos
+version: 1.4.0
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - $(cat ~/.ssh/id_rsa.pub)
+storage:
+  files:
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: $HOSTNAME
+    - path: /usr/local/bin/install_k0s
+      mode: 0755
+      contents:
+        inline: |
+          #!/bin/bash
+
+          test -f /usr/local/bin/k0s || {
+              curl -sSLf https://get.k0s.sh | sudo sh
+              k0s install controller --single
+              k0s start
+          }
+
+          while ! test -f /var/lib/k0s/pki/admin.conf ; do
+              sleep 1
+          done 
+          cat /var/lib/k0s/pki/admin.conf | sed s_https://localhost:6443_https://$FQDN:6443_ | sed "s/certificate-authority-data: .*$/insecure-skip-tls-verify: true/" >/var/home/core/kubeconfig
+          chown core:core /var/home/core/kubeconfig
+systemd:
+  units:
+    - name: install_k0s.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Installs k0s
+        After=network-online.target
+        Wants=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/local/bin/install_k0s
+        [Install]
+        WantedBy=multi-user.target
+EOF
+
+IGNITION_PATH=$(mktemp -p .)
+
+
+butane $BUTANE_PATH >$IGNITION_PATH
+
+coreos-installer iso customize $ISO_FILENAME --dest-device=/dev/sda --dest-ignition=$IGNITION_PATH -o $OUTPUT
+
+rm $IGNITION_PATH $BUTANE_PATH
