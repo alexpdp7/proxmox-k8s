@@ -1,0 +1,145 @@
+#!/bin/bash
+
+set -ue
+
+HOSTNAME=$1
+FQDN=$2
+POD_NETWORK_CIDR=$3
+OUTPUT=$4
+
+CNI_VERSION="v1.1.1"
+ARCH="amd64"
+CRICTL_VERSION="v1.23.0"
+KUBE_VERSION="v1.23.5"
+KUBE_RELEASE="v0.13.0"
+
+ISO_URL=$(curl https://builds.coreos.fedoraproject.org/streams/stable.json | jq -r .architectures.x86_64.artifacts.metal.formats.iso.disk.location)
+ISO_FILENAME=$(basename $ISO_URL)
+
+test -f $ISO_FILENAME || wget $ISO_URL
+
+function coreos-installer() {
+    docker run -it --rm -v $(pwd):/work -w /work --pull=always -u $(id -u):$(id -g) quay.io/coreos/coreos-installer:release "$@"
+}
+
+function butane() {
+    docker run -it --rm -v $(pwd):/work -w /work --pull=always -u $(id -u):$(id -g) quay.io/coreos/butane:release "$@"
+}
+
+BUTANE_PATH=$(mktemp -p .)
+
+cat >$BUTANE_PATH <<EOF
+variant: fcos
+version: 1.4.0
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - $(cat ~/.ssh/id_rsa.pub)
+storage:
+  files:
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: $HOSTNAME
+    - path: /usr/local/bin/install_k8s
+      mode: 0755
+      contents:
+        inline: |
+          #!/bin/bash -x
+
+          set -ue
+
+          # TODO: kube-apiserver can't read the sa.key file
+          setenforce 0
+          sed -i s/SELINUX=enforcing/SELINUX=disabled/ /etc/sysconfig/selinux
+
+          cat <<EOF >/etc/modules-load.d/k8s.conf
+          br_netfilter
+          EOF
+
+          modprobe br_netfilter overlay
+
+          cat <<EOF > /etc/sysctl.d/k8s.conf
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.bridge.bridge-nf-call-iptables = 1
+          EOF
+
+          sysctl --system
+
+          which conntrack || {
+            rpm-ostree install conntrack
+            systemctl reboot
+          }
+
+          mkdir -p /opt/cni/bin
+          curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-${ARCH}-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
+
+          (
+            cd /usr/local/bin
+            curl -L "https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-${ARCH}.tar.gz" | tar -xz
+
+            curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/bin/linux/${ARCH}/{kubeadm,kubelet,kubectl}
+            chmod +x {kubeadm,kubelet,kubectl}
+          )
+
+          curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${KUBE_RELEASE}/cmd/kubepkg/templates/latest/deb/kubelet/lib/systemd/system/kubelet.service" | sed "s:/usr/bin:/usr/local/bin:g" > /etc/systemd/system/kubelet.service
+          mkdir -p /etc/systemd/system/kubelet.service.d
+          curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${KUBE_RELEASE}/cmd/kubepkg/templates/latest/deb/kubeadm/10-kubeadm.conf" | sed "s:/usr/bin:/usr/local/bin:g" > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+          systemctl enable --now containerd
+          systemctl enable --now kubelet
+
+          cat <<EOF >/etc/kubeadm.conf
+          apiVersion: kubeadm.k8s.io/v1beta3
+          kind: InitConfiguration
+          nodeRegistration:
+            kubeletExtraArgs:
+              volume-plugin-dir: "/opt/libexec/kubernetes/kubelet-plugins/volume/exec/"
+          ---
+          kind: ClusterConfiguration
+          apiVersion: kubeadm.k8s.io/v1beta3
+          kubernetesVersion: $KUBE_VERSION
+          controlPlaneEndpoint: "$FQDN:6443"
+          controllerManager:
+            extraArgs:
+              flex-volume-plugin-dir: "/opt/libexec/kubernetes/kubelet-plugins/volume/exec/"
+          networking:
+            podSubnet: "$POD_NETWORK_CIDR"
+          ---
+          kind: KubeletConfiguration
+          apiVersion: kubelet.config.k8s.io/v1beta1
+          cgroupDriver: systemd
+          EOF
+
+          kubeadm init --config /etc/kubeadm.conf
+          export KUBECONFIG=/etc/kubernetes/admin.conf
+          kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+          kubectl taint nodes --all node-role.kubernetes.io/master-
+          mkdir -p /home/core/.kube/
+          cp /etc/kubernetes/admin.conf /home/core/.kube/config
+          chown -R core:core /home/core/.kube/config
+#systemd:
+#  units:
+#    - name: install_k8s.service
+#      enabled: true
+#      contents: |
+#        [Unit]
+#        Description=Installs k8s
+#        After=network-online.target
+#        Wants=network-online.target
+#        [Service]
+#        Type=oneshot
+#        RemainAfterExit=yes
+#        ExecStart=/usr/local/bin/install_k8s
+#        [Install]
+#        WantedBy=multi-user.target
+EOF
+
+IGNITION_PATH=$(mktemp -p .)
+
+butane $BUTANE_PATH >$IGNITION_PATH
+
+coreos-installer iso customize $ISO_FILENAME --dest-device=/dev/sda --dest-ignition=$IGNITION_PATH -o $OUTPUT
+
+rm $IGNITION_PATH $BUTANE_PATH
