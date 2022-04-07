@@ -43,7 +43,12 @@ storage:
 
           test -f /usr/local/bin/k0s || {
               curl -sSLf https://get.k0s.sh | sudo sh
-              k0s install controller --single
+              mkdir -p /etc/k0s
+              k0s config create | {
+                sed 's/type: external_storage/type: openebs_local_storage/' |
+                sed 's/create_default_storage_class: false/create_default_storage_class: true/'
+              } > /etc/k0s/k0s.yaml
+              k0s install controller --single -c /etc/k0s/k0s.yaml
               k0s start
           }
 
