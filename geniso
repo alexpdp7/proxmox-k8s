@@ -48,11 +48,13 @@ storage:
         inline: |
           #!/bin/bash -x
 
+          test -f /home/core/.kube/config && exit
+          selinuxenabled && setenforce 0
+
           set -ue
 
           # TODO: kube-apiserver can't read the sa.key file
-          setenforce 0
-          sed -i s/SELINUX=enforcing/SELINUX=disabled/ /etc/sysconfig/selinux
+          sed -i s/SELINUX=enforcing/SELINUX=disabled/ /etc/selinux/config
 
           cat <<EOF >/etc/modules-load.d/k8s.conf
           br_netfilter
@@ -68,7 +70,12 @@ storage:
           sysctl --system
 
           which conntrack || {
+            while pgrep ostree ; do
+              echo waiting for ostree
+              sleep 5
+            done
             rpm-ostree install conntrack
+            echo rebooting for ostree
             systemctl reboot
           }
 
@@ -114,26 +121,26 @@ storage:
 
           kubeadm init --config /etc/kubeadm.conf
           export KUBECONFIG=/etc/kubernetes/admin.conf
-          kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+          kubectl apply -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
           kubectl taint nodes --all node-role.kubernetes.io/master-
           mkdir -p /home/core/.kube/
           cp /etc/kubernetes/admin.conf /home/core/.kube/config
           chown -R core:core /home/core/.kube/config
-#systemd:
-#  units:
-#    - name: install_k8s.service
-#      enabled: true
-#      contents: |
-#        [Unit]
-#        Description=Installs k8s
-#        After=network-online.target
-#        Wants=network-online.target
-#        [Service]
-#        Type=oneshot
-#        RemainAfterExit=yes
-#        ExecStart=/usr/local/bin/install_k8s
-#        [Install]
-#        WantedBy=multi-user.target
+systemd:
+  units:
+    - name: install_k8s.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Installs k8s
+        After=network-online.target
+        Wants=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/local/bin/install_k8s
+        [Install]
+        WantedBy=multi-user.target
 EOF
 
 IGNITION_PATH=$(mktemp -p .)
