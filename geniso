@@ -11,6 +11,7 @@ CNI_VERSION="v1.1.1"
 ARCH="amd64"
 CRICTL_VERSION="v1.23.0"
 KUBE_VERSION="v1.23.5"
+CRIO_VERSION="v1.23.2"  # x.y.* must match KUBE_VERSION
 KUBE_RELEASE="v0.13.0"
 
 ISO_URL=$(curl https://builds.coreos.fedoraproject.org/streams/stable.json | jq -r .architectures.x86_64.artifacts.metal.formats.iso.disk.location)
@@ -49,22 +50,20 @@ storage:
           #!/bin/bash -x
 
           test -f /home/core/.kube/config && exit
-          selinuxenabled && setenforce 0
 
           set -ue
 
-          # TODO: kube-apiserver can't read the sa.key file
-          sed -i s/SELINUX=enforcing/SELINUX=disabled/ /etc/selinux/config
-
-          cat <<EOF >/etc/modules-load.d/k8s.conf
+          cat <<EOF > /etc/modules-load.d/crio.conf
+          overlay
           br_netfilter
           EOF
 
           modprobe br_netfilter overlay
 
-          cat <<EOF > /etc/sysctl.d/k8s.conf
+          cat <<EOF > /etc/sysctl.d/99-kubernetes-cri.conf
+          net.bridge.bridge-nf-call-iptables  = 1
+          net.ipv4.ip_forward                 = 1
           net.bridge.bridge-nf-call-ip6tables = 1
-          net.bridge.bridge-nf-call-iptables = 1
           EOF
 
           sysctl --system
@@ -78,6 +77,13 @@ storage:
             echo rebooting for ostree
             systemctl reboot
           }
+
+          systemctl disable --now docker.socket
+          systemctl mask docker.service
+          systemctl mask containerd.service
+
+          curl https://raw.githubusercontent.com/cri-o/cri-o/main/scripts/get | bash -s -- -t $CRIO_VERSION
+          systemctl enable crio --now
 
           mkdir -p /opt/cni/bin
           curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-${ARCH}-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
@@ -94,7 +100,6 @@ storage:
           mkdir -p /etc/systemd/system/kubelet.service.d
           curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${KUBE_RELEASE}/cmd/kubepkg/templates/latest/deb/kubeadm/10-kubeadm.conf" | sed "s:/usr/bin:/usr/local/bin:g" > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 
-          systemctl enable --now containerd
           systemctl enable --now kubelet
 
           cat <<EOF >/etc/kubeadm.conf
