@@ -1,8 +1,10 @@
 # Introduction
 
-A simple script to simplify installing K8S on Proxmox
+A simple Kubernetes setup for Proxmox.
 
 # Usage
+
+Create the install ISO:
 
 ```
 ./geniso <hostname> <fqdn> <pod_network_cidr> <iso_name>
