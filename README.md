@@ -13,14 +13,28 @@ Create the install ISO:
 * Downloads the latest Fedora CoreOS ISO
 * Applies customizations
   * Uses `~/.ssh/id_rsa.pub` for the core user
-  * Sets the hostname
-  * Sets to autoinstall to `/dev/sda`
-  * Installs K8S
+
+Boot the ISO in a VM.
+
+Watch the installation process:
+
+```
+$ while true ; do date ; ssh -o ConnectTimeout=5 core@<fqdn> journalctl -xe -u install_k8s.service -f ; sleep 1 ; done
+```
+
+The system will reboot twice before being ready. Until after the first reboot, SSH is not available.
 
 Obtain the kubectl config:
 
 ```
-$ ssh core@<fqdn> cat .kube/config
+$ ssh core@<fqdn> cat .kube/config >~/.kube/config
+```
+
+## Add storage
+
+```
+$ kubectl apply -f https://openebs.github.io/charts/openebs-operator-lite.yaml
+$ kubectl apply -f https://openebs.github.io/charts/openebs-lite-sc.yaml
 ```
 
 # Non-goals
