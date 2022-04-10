@@ -7,7 +7,7 @@ A simple Kubernetes setup for Proxmox.
 Create the install ISO:
 
 ```
-./geniso <hostname> <fqdn> <pod_network_cidr> <iso_name>
+./geniso <hostname> <fqdn> <iso_name>
 ```
 
 * Downloads the latest Fedora CoreOS ISO
@@ -28,14 +28,6 @@ Obtain the kubectl config:
 
 ```
 $ ssh core@<fqdn> cat .kube/config >~/.kube/config
-```
-
-## Add storage
-
-```
-$ kubectl apply -f https://openebs.github.io/charts/openebs-operator-lite.yaml
-$ kubectl apply -f https://openebs.github.io/charts/openebs-lite-sc.yaml
-$ kubectl patch storageclass openebs-hostpath -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 ```
 
 # Non-goals

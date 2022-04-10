@@ -4,15 +4,7 @@ set -ue
 
 HOSTNAME=$1
 FQDN=$2
-POD_NETWORK_CIDR=$3
-OUTPUT=$4
-
-CNI_VERSION="v1.1.1"
-ARCH="amd64"
-CRICTL_VERSION="v1.23.0"
-KUBE_VERSION="v1.23.5"
-CRIO_VERSION="v1.23.2"  # x.y.* must match KUBE_VERSION
-KUBE_RELEASE="v0.13.0"
+OUTPUT=$3
 
 ISO_URL=$(curl https://builds.coreos.fedoraproject.org/streams/stable.json | jq -r .architectures.x86_64.artifacts.metal.formats.iso.disk.location)
 ISO_FILENAME=$(basename $ISO_URL)
@@ -53,84 +45,12 @@ storage:
 
           set -ue
 
-          cat <<EOF > /etc/modules-load.d/crio.conf
-          overlay
-          br_netfilter
-          EOF
+          curl -sfL https://get.k3s.io | sh -
 
-          modprobe br_netfilter overlay
-
-          cat <<EOF > /etc/sysctl.d/99-kubernetes-cri.conf
-          net.bridge.bridge-nf-call-iptables  = 1
-          net.ipv4.ip_forward                 = 1
-          net.bridge.bridge-nf-call-ip6tables = 1
-          EOF
-
-          sysctl --system
-
-          which conntrack || {
-            while pgrep ostree ; do
-              echo waiting for ostree
-              sleep 5
-            done
-            rpm-ostree install conntrack
-            echo rebooting for ostree
-            systemctl reboot
-          }
-
-          systemctl disable --now docker.socket
-          systemctl mask docker.service
-          systemctl mask containerd.service
-
-          curl https://raw.githubusercontent.com/cri-o/cri-o/main/scripts/get | bash -s -- -t $CRIO_VERSION
-          systemctl enable crio --now
-
-          mkdir -p /opt/cni/bin
-          curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-${ARCH}-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
-
-          (
-            cd /usr/local/bin
-            curl -L "https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-${ARCH}.tar.gz" | tar -xz
-
-            curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/bin/linux/${ARCH}/{kubeadm,kubelet,kubectl}
-            chmod +x {kubeadm,kubelet,kubectl}
-          )
-
-          curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${KUBE_RELEASE}/cmd/kubepkg/templates/latest/deb/kubelet/lib/systemd/system/kubelet.service" | sed "s:/usr/bin:/usr/local/bin:g" > /etc/systemd/system/kubelet.service
-          mkdir -p /etc/systemd/system/kubelet.service.d
-          curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${KUBE_RELEASE}/cmd/kubepkg/templates/latest/deb/kubeadm/10-kubeadm.conf" | sed "s:/usr/bin:/usr/local/bin:g" > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-
-          systemctl enable --now kubelet
-
-          cat <<EOF >/etc/kubeadm.conf
-          apiVersion: kubeadm.k8s.io/v1beta3
-          kind: InitConfiguration
-          nodeRegistration:
-            kubeletExtraArgs:
-              volume-plugin-dir: "/opt/libexec/kubernetes/kubelet-plugins/volume/exec/"
-          ---
-          kind: ClusterConfiguration
-          apiVersion: kubeadm.k8s.io/v1beta3
-          kubernetesVersion: $KUBE_VERSION
-          controlPlaneEndpoint: "$FQDN:6443"
-          controllerManager:
-            extraArgs:
-              flex-volume-plugin-dir: "/opt/libexec/kubernetes/kubelet-plugins/volume/exec/"
-          networking:
-            podSubnet: "$POD_NETWORK_CIDR"
-          ---
-          kind: KubeletConfiguration
-          apiVersion: kubelet.config.k8s.io/v1beta1
-          cgroupDriver: systemd
-          EOF
-
-          kubeadm init --config /etc/kubeadm.conf
-          export KUBECONFIG=/etc/kubernetes/admin.conf
-          kubectl apply -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
-          kubectl taint nodes --all node-role.kubernetes.io/master-
           mkdir -p /home/core/.kube/
-          cp /etc/kubernetes/admin.conf /home/core/.kube/config
-          chown -R core:core /home/core/.kube/config
+          cp /etc/rancher/k3s/k3s.yaml /home/core/.kube/config
+          chown -R core:core /home/core/.kube/
+          sed -i "s=server: https://127.0.0.1:6443=server: https://$FQDN:6443=" /home/core/.kube/config
 systemd:
   units:
     - name: install_k8s.service
