@@ -41,3 +41,7 @@ $ kubectl patch storageclass openebs-hostpath -p '{"metadata": {"annotations":{"
 # Non-goals
 
 * Multiple nodes (I'm using this to run Kubernetes on a single Proxmox server, so besides updates, I don't have much use for multiple nodes)
+
+# Known issues
+
+Under certain conditions, some images (most notable BusyBox) do not resolve short names like `kube-dns.kube-system` correctly.
