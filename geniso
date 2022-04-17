@@ -205,7 +205,7 @@ storage:
 
           mkdir -p /home/core/.kube/
           cp /etc/kubernetes/admin.conf /home/core/.kube/config
-          chown -R core:core /home/core/.kube/config
+          chown -R core:core /home/core/.kube
 systemd:
   units:
     - name: install_k8s.service
