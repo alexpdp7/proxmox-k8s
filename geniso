@@ -5,7 +5,8 @@ set -ue
 HOSTNAME=$1
 FQDN=$2
 POD_NETWORK_CIDR=$3
-OUTPUT=$4
+DOMAIN=$4
+OUTPUT=$5
 
 CNI_VERSION="v1.1.1"
 ARCH="amd64"
@@ -199,6 +200,67 @@ storage:
             desiredNumberScheduled: 0
             numberMisscheduled: 0
             numberReady: 0
+          EOF
+
+          kubectl <<EOF create -f -
+          apiVersion: v1
+          kind: Service
+          metadata:
+            labels:
+              k8s-app: kube-dns
+              kubernetes.io/cluster-service: "true"
+              kubernetes.io/name: CoreDNS
+            name: kube-dns-nodeport
+            namespace: kube-system
+          spec:
+            ports:
+            - nodePort: 30053
+              port: 53
+              protocol: TCP
+              targetPort: 53
+              name: dns-tcp
+            - nodePort: 30053
+              port: 53
+              protocol: UDP
+              targetPort: 53
+              name: dns-udp
+            selector:
+              k8s-app: kube-dns
+            sessionAffinity: None
+            type: NodePort
+          status:
+            loadBalancer: {}
+          EOF
+
+          kubectl <<EOF apply -f -
+          apiVersion: v1
+          data:
+            Corefile: |
+              .:53 {
+                  errors
+                  health {
+                    lameduck 5s
+                  }
+                  ready
+                  kubernetes cluster.local in-addr.arpa ip6.arpa {
+                    pods insecure
+                    fallthrough in-addr.arpa ip6.arpa
+                    ttl 30
+                  }
+                  k8s_external $DOMAIN
+                  prometheus :9153
+                  forward . /etc/resolv.conf {
+                    max_concurrent 1000
+                  }
+                  cache 30
+                  loop
+                  reload
+                  loadbalance
+              }
+          kind: ConfigMap
+          metadata:
+            name: coredns
+            namespace: kube-system
           EOF
 
           kubectl apply -f https://raw.githubusercontent.com/kube-vip/kube-vip-cloud-provider/main/manifest/kube-vip-cloud-controller.yaml

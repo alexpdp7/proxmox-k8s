@@ -7,7 +7,7 @@ A simple Kubernetes setup for Proxmox.
 Create the install ISO:
 
 ```
-./geniso <hostname> <fqdn> <pod_network_cidr> <iso_name>
+./geniso <hostname> <fqdn> <pod_network_cidr> <k8s_domain> <iso_name>
 ```
 
 * Downloads the latest Fedora CoreOS ISO
@@ -29,6 +29,20 @@ Obtain the kubectl config:
 ```
 $ ssh core@<fqdn> cat .kube/config >~/.kube/config
 ```
+
+## Configure DNS
+
+Apply the following dnsmasq configuration:
+
+```
+dhcp-host=<hostname>,<ip>,<hostname>
+server=/<k8s_domain>/<ip>#30053
+```
+
+* The `dhcp-host` entry fixes the IP of the K8S host, because dnsmasq can only delegate domains to static IPs.
+* Delegates the K8S domain to CoreDNS exposed as a NodePort.
+
+Exposing a service using a LoadBalancer will make the service visible at `<service>.<namespace>.<k8s_domain>`.
 
 ## Add storage
 
