@@ -127,7 +127,9 @@ storage:
 
           kubeadm init --config /etc/kubeadm.conf
           export KUBECONFIG=/etc/kubernetes/admin.conf
+
           kubectl apply -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
+
           kubectl taint nodes --all node-role.kubernetes.io/master-
           mkdir -p /home/core/.kube/
           cp /etc/kubernetes/admin.conf /home/core/.kube/config
