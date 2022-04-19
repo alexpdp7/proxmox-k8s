@@ -265,6 +265,9 @@ storage:
 
           kubectl apply -f https://raw.githubusercontent.com/kube-vip/kube-vip-cloud-provider/main/manifest/kube-vip-cloud-controller.yaml
 
+          kubectl create -f https://raw.githubusercontent.com/jcmoraisjr/haproxy-ingress/master/docs/haproxy-ingress.yaml
+          kubectl label node --all role=ingress-controller
+
           mkdir -p /home/core/.kube/
           cp /etc/kubernetes/admin.conf /home/core/.kube/config
           chown -R core:core /home/core/.kube

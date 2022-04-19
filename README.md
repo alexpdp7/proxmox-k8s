@@ -37,12 +37,23 @@ Apply the following dnsmasq configuration:
 ```
 dhcp-host=<hostname>,<ip>,<hostname>
 server=/<k8s_domain>/<ip>#30053
+address=/<k8s_ingress_domain>/<ip>
+
 ```
 
 * The `dhcp-host` entry fixes the IP of the K8S host, because dnsmasq can only delegate domains to static IPs.
 * Delegates the K8S domain to CoreDNS exposed as a NodePort.
+* Creates a "wildcard" DNS for Ingress.
 
 Exposing a service using a LoadBalancer will make the service visible at `<service>.<namespace>.<k8s_domain>`.
+
+Create ingresses like:
+
+```
+$ kubectl -n <ns> create ingress <ingress_name> --annotation kubernetes.io/ingress.class=haproxy --rule="<subdomain>.<k8s_ingress_domain>/*=<service_name>:<port>,tls"
+```
+
+They will be exposed at `<subdomain>.<k8s_ingress_domain>`.
 
 ## Add storage
 
