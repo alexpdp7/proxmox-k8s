@@ -24,6 +24,10 @@ Projects like Minikube bring a base VM, taking care of the underlying OS.
 However, Minikube is geared towards running that VM in an hypervisor in your workstation.
 Using Minikube to deploy a VM to hypervisors such as Proxmox does not seem to be a first-class citizen (for now).
 
+Another noteworthy feature is that this setup integrates with existing DHCP.
+Most bare metal setups use MetalLB, which requires reserving an IP range.
+This uses kube-vip as a load balancer that can request IPs via DHCP.
+
 # Requirements
 
 * Working DHCP/DNS on your network.
