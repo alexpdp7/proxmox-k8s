@@ -17,6 +17,12 @@ There are many interesting projects to run Kubernetes clusters, but using an imm
 Immutable OS typically provide easy ways for provisioning.
 In this case, a simple script can create an ISO that sets everything up automatically on start.
 I don't think there can be a simpler process with less manual steps.
+For example, K3S, while offering interesting features (like replacing etcd with Sqlite) does not "solve" the underlying OS.
+This project provisions both the underlying OS *and* Kubernetes in one step.
+
+Projects like Minikube bring a base VM, taking care of the underlying OS.
+However, Minikube is geared towards running that VM in an hypervisor in your workstation.
+Using Minikube to deploy a VM to hypervisors such as Proxmox does not seem to be a first-class citizen (for now).
 
 # Requirements
 
