@@ -115,6 +115,10 @@ They will be exposed at `<subdomain>.<k8s_ingress_domain>`.
 $ ./install-openebs
 ```
 
+## Reinstalling
+
+If you keep the ISO added to the VM, then you can reset the VM and select booting from the ISO to reinstall.
+
 # Priorities
 
 Ranked from top to low.
