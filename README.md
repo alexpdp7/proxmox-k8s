@@ -112,9 +112,7 @@ They will be exposed at `<subdomain>.<k8s_ingress_domain>`.
 ## Add storage
 
 ```
-$ kubectl apply -f https://openebs.github.io/charts/openebs-operator-lite.yaml
-$ kubectl apply -f https://openebs.github.io/charts/openebs-lite-sc.yaml
-$ kubectl patch storageclass openebs-hostpath -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+$ ./install-openebs
 ```
 
 # Priorities
