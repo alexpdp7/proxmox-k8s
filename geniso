@@ -65,7 +65,8 @@ storage:
           br_netfilter
           EOF
 
-          modprobe br_netfilter overlay
+          modprobe br_netfilter
+          modprobe overlay
 
           cat <<EOF > /etc/sysctl.d/99-kubernetes-cri.conf
           net.bridge.bridge-nf-call-iptables  = 1
