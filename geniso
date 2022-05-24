@@ -10,18 +10,13 @@ OUTPUT=$5
 
 ARCH="amd64"
 
-# https://github.com/kubernetes-sigs/cri-tools/releases/
-CRICTL_VERSION="v1.24.1"
-# https://kubernetes.io/releases/
-KUBE_VERSION="v1.24.0"
-# https://github.com/cri-o/cri-o/releases
-CRIO_VERSION="v1.24.0"  # x.y.* must match KUBE_VERSION
-# https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
-KUBE_RELEASE="v0.4.0"
+# Must match x.y.*
+KUBE_VERSION="1.23.6"
+CRIO_VERSION="1.23"
 
 # to perform updates, also review the kubevip commands below
 
-ISO_URL=$(curl https://builds.coreos.fedoraproject.org/streams/stable.json | jq -r .architectures.x86_64.artifacts.metal.formats.iso.disk.location)
+ISO_URL=$(curl https://builds.coreos.fedoraproject.org/streams/testing.json | jq -r .architectures.x86_64.artifacts.metal.formats.iso.disk.location)
 ISO_FILENAME=$(basename $ISO_URL)
 
 test -f $ISO_FILENAME || wget $ISO_URL
@@ -76,12 +71,23 @@ storage:
 
           sysctl --system
 
-          which conntrack || {
+          cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+          [kubernetes]
+          name=Kubernetes
+          baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+          enabled=1
+          gpgcheck=1
+          repo_gpgcheck=1
+          gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+          EOF
+
+          { which conntrack && which crio ; } || {
             while pgrep ostree ; do
               echo waiting for ostree
               sleep 5
             done
-            rpm-ostree install conntrack
+            rpm-ostree install conntrack kubelet-$KUBE_VERSION kubeadm-$KUBE_VERSION kubectl-$KUBE_VERSION
+            rpm-ostree ex module install cri-o:$CRIO_VERSION/default
             echo rebooting for ostree
             systemctl reboot
           }
@@ -90,19 +96,7 @@ storage:
           systemctl mask docker.service
           systemctl mask containerd.service
 
-          curl https://raw.githubusercontent.com/cri-o/cri-o/main/scripts/get | bash -s -- -t $CRIO_VERSION
           systemctl enable crio --now
-
-          (
-            cd /usr/local/bin
-            curl -L "https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-${ARCH}.tar.gz" | tar -xz
-            curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/bin/linux/${ARCH}/{kubeadm,kubelet,kubectl}
-            chmod +x {kubeadm,kubelet,kubectl}
-          )
-
-          curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${KUBE_RELEASE}/cmd/kubepkg/templates/latest/deb/kubelet/lib/systemd/system/kubelet.service" | sed "s:/usr/bin:/usr/local/bin:g" > /etc/systemd/system/kubelet.service
-          mkdir -p /etc/systemd/system/kubelet.service.d
-          curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${KUBE_RELEASE}/cmd/kubepkg/templates/latest/deb/kubeadm/10-kubeadm.conf" | sed "s:/usr/bin:/usr/local/bin:g" > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 
           systemctl enable --now kubelet
 
@@ -116,7 +110,7 @@ storage:
           ---
           kind: ClusterConfiguration
           apiVersion: kubeadm.k8s.io/v1beta3
-          kubernetesVersion: $KUBE_VERSION
+          kubernetesVersion: v$KUBE_VERSION
           controlPlaneEndpoint: "$FQDN:6443"
           controllerManager:
             extraArgs:
@@ -134,7 +128,9 @@ storage:
 
           kubectl apply -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
 
-          kubectl taint nodes --all node-role.kubernetes.io/control-plane- node-role.kubernetes.io/master-
+          # kubernetes 1.24 will require:
+          # kubectl taint nodes --all node-role.kubernetes.io/control-plane- node-role.kubernetes.io/master-
+          kubectl taint nodes --all node-role.kubernetes.io/master-
 
           kubectl apply -f https://kube-vip.io/manifests/rbac.yaml
 
