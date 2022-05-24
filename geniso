@@ -10,8 +10,6 @@ OUTPUT=$5
 
 ARCH="amd64"
 
-# https://github.com/containernetworking/plugins/releases/
-CNI_VERSION="v1.1.1"
 # https://github.com/kubernetes-sigs/cri-tools/releases/
 CRICTL_VERSION="v1.24.1"
 # https://kubernetes.io/releases/
@@ -93,9 +91,6 @@ storage:
 
           curl https://raw.githubusercontent.com/cri-o/cri-o/main/scripts/get | bash -s -- -t $CRIO_VERSION
           systemctl enable crio --now
-
-          mkdir -p /opt/cni/bin
-          curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-${ARCH}-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
 
           (
             cd /usr/local/bin
