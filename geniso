@@ -16,7 +16,7 @@ CRIO_VERSION="1.23"
 
 # to perform updates, also review the kubevip commands below
 
-ISO_URL=$(curl https://builds.coreos.fedoraproject.org/streams/testing.json | jq -r .architectures.x86_64.artifacts.metal.formats.iso.disk.location)
+ISO_URL=$(curl https://builds.coreos.fedoraproject.org/streams/stable.json | jq -r .architectures.x86_64.artifacts.metal.formats.iso.disk.location)
 ISO_FILENAME=$(basename $ISO_URL)
 
 test -f $ISO_FILENAME || wget $ISO_URL
