@@ -56,9 +56,12 @@
           client-key-data: {{ kubeconfig.users[0].user["client-key-data"] }}
   delegate_to: 127.0.0.1
 - name: merge config
-  shell: "kubectl config view --raw=true >{{ lookup('env', 'HOME') }}/.kube/config"
+  shell: "kubectl config view --raw=true >{{ lookup('env', 'HOME') }}/.kube/config.pk8stmp"
   environment:
     KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/{{ inventory_hostname }}:{{ lookup('env', 'HOME') }}/.kube/config"
+  delegate_to: 127.0.0.1
+- name: replace config
+  command: "mv {{ lookup('env', 'HOME') }}/.kube/config.pk8stmp {{ lookup('env', 'HOME') }}/.kube/config"
   delegate_to: 127.0.0.1
 - name: switch context
   command: "kubectl config use-context kubernetes-admin@{{ inventory_hostname }}"
