@@ -21,12 +21,20 @@ ISO_FILENAME=$(basename $ISO_URL)
 
 test -f $ISO_FILENAME || wget $ISO_URL
 
+function run_container() {
+    if which podman &>/dev/null ; then
+	podman run --rm -v $(pwd):/work -w /work --security-opt label=disable "$@"
+    else
+	docker run --rm -v $(pwd):/work -w /work -u $(id -u):$(id -g) "$@"
+    fi
+}
+
 function coreos-installer() {
-    docker run -it --rm -v $(pwd):/work -w /work --pull=always -u $(id -u):$(id -g) quay.io/coreos/coreos-installer:release "$@"
+    run_container quay.io/coreos/coreos-installer:release "$@"
 }
 
 function butane() {
-    docker run -it --rm -v $(pwd):/work -w /work --pull=always -u $(id -u):$(id -g) quay.io/coreos/butane:release "$@"
+    run_container quay.io/coreos/butane:release "$@"
 }
 
 BUTANE_PATH=$(mktemp -p .)
