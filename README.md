@@ -38,7 +38,7 @@ This uses kube-vip as a load balancer that can request IPs via DHCP.
   * You should be able to delegate a DNS zone to the Kubernetes host, using port 30053, *not* 53.
   * You should be able to create a wildcard A record pointing to the Kubernetes host.
 
-* Docker (Podman should also work) on the machine you will use to prepare the cluster.
+* Docker or Podman on the machine you will use to prepare the cluster.
 * An empty cluster consumes less than 1gb of RAM.
 
 # Overview
