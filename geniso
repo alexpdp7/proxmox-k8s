@@ -299,6 +299,6 @@ IGNITION_PATH=$(mktemp -p .)
 
 butane $BUTANE_PATH >$IGNITION_PATH
 
-coreos-installer iso customize $ISO_FILENAME --dest-device=/dev/sda --dest-ignition=$IGNITION_PATH -o $OUTPUT
+coreos-installer iso customize $ISO_FILENAME --dest-device=/dev/vda --dest-ignition=$IGNITION_PATH -o $OUTPUT
 
 rm $IGNITION_PATH $BUTANE_PATH
