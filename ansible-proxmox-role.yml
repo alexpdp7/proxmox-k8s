@@ -1,0 +1,95 @@
+---
+- name: remove previous iso
+  file:
+    name: "{{ inventory_hostname }}.iso"
+    state: absent
+  delegate_to: 127.0.0.1
+- name: create iso
+  command: "./k8s-iso/geniso {{ inventory_hostname_short }} {{ inventory_hostname }} {{ pod_network }} {{ lb_domain }} {{ inventory_hostname }}.iso"
+  delegate_to: 127.0.0.1
+- name: ferry iso
+  command: "rsync {{ inventory_hostname }}.iso {{ k8s_proxmox_host }}:{{ k8s_iso_stage }}/{{ inventory_hostname }}.iso"
+  delegate_to: 127.0.0.1
+- name: place iso
+  copy:
+    src: "{{ k8s_iso_stage }}/{{ inventory_hostname }}.iso"
+    dest: "/var/lib/vz/template/iso/{{ inventory_hostname }}.iso"
+    remote_src: yes
+  delegate_to: "{{ k8s_proxmox_host }}"
+- name: create vm
+  command: "qm create {{ proxmox_vmid }} -cdrom /var/lib/vz/template/iso/{{ inventory_hostname }}.iso -cores {{ proxmox_cores }} -memory {{ proxmox_memory_mb }} -name {{ inventory_hostname }} -onboot {{ proxmox_onboot }} -start -virtio0 local-zfs:32 -net0 virtio,bridge=vmbr0,firewall=1"
+  delegate_to: "{{ k8s_proxmox_host }}"
+- name: wait until k8s config is available
+  command: "ssh {{ inventory_hostname}} cat /home/core/.kube/config"
+  register: result
+  until: result.rc == 0
+  retries: 60
+  delay: 10
+  delegate_to: 127.0.0.1
+- name: get config
+  command: "ssh {{ inventory_hostname }} kubectl config view --raw=true -o json"
+  delegate_to: 127.0.0.1
+  register: kubeconfig_result
+- name: parse config
+  set_fact:
+    kubeconfig: "{{ kubeconfig_result.stdout | from_json }}"
+- name: create config
+  blockinfile:
+    path: "{{ lookup('env', 'HOME') }}/.kube/{{ inventory_hostname }}"
+    create: yes
+    block: |
+      apiVersion: v1
+      clusters:
+      - cluster:
+          certificate-authority-data: {{ kubeconfig.clusters[0].cluster["certificate-authority-data"] }}
+          server: https://{{ inventory_hostname }}:6443
+        name: {{ inventory_hostname }}
+      contexts:
+      - context:
+          cluster: {{ inventory_hostname }}
+          user: kubernetes-admin-{{ inventory_hostname }}
+        name: kubernetes-admin@{{ inventory_hostname }}
+      users:
+      - name: kubernetes-admin-{{ inventory_hostname }}
+        user:
+          client-certificate-data: {{ kubeconfig.users[0].user["client-certificate-data"] }}
+          client-key-data: {{ kubeconfig.users[0].user["client-key-data"] }}
+  delegate_to: 127.0.0.1
+- name: merge config
+  shell: "kubectl config view --raw=true >{{ lookup('env', 'HOME') }}/.kube/config"
+  environment:
+    KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/{{ inventory_hostname }}:{{ lookup('env', 'HOME') }}/.kube/config"
+  delegate_to: 127.0.0.1
+- name: switch context
+  command: "kubectl config use-context kubernetes-admin@{{ inventory_hostname }}"
+  delegate_to: 127.0.0.1
+- name: wait for deployments
+  command: "kubectl wait deployment -n {{ item.namespace }}  {{ item.name }} --for condition=Available --timeout=1000s"
+  loop:
+    - { namespace: ingress-controller, name: ingress-default-backend }
+    - { namespace: kube-system, name: coredns }
+  delegate_to: 127.0.0.1
+- name: wait for daemonsets
+  command: "kubectl rollout status daemonset -n {{ item.namespace }} {{ item.name }}"
+  loop:
+    - { namespace: ingress-controller, name: haproxy-ingress }
+    - { namespace: kube-system, name: kube-proxy }
+    - { namespace: kube-system, name: kube-router }
+    - { namespace: kube-system, name: kube-vip-ds }
+  delegate_to: 127.0.0.1
+- name: install storage
+  command: "./k8s-iso/install-openebs"
+  delegate_to: 127.0.0.1
+- name: wait for openebs deployments
+  command: "kubectl wait deployment -n openebs  {{ item }} --for condition=Available --timeout=1000s"
+  loop:
+    - openebs-localpv-provisioner
+    - openebs-ndm-cluster-exporter
+    - openebs-ndm-operator
+  delegate_to: 127.0.0.1
+- name: wait for openebs daemonsets
+  command: "kubectl rollout status daemonset -n openebs {{ item }}"
+  loop:
+    - openebs-ndm
+    - openebs-ndm-node-exporter
+  delegate_to: 127.0.0.1

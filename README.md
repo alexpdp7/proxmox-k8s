@@ -119,6 +119,10 @@ $ ./install-openebs
 
 If you keep the ISO added to the VM, then you can reset the VM and select booting from the ISO to reinstall.
 
+## Installing using Ansible
+
+See [ANSIBLE.md](ANSIBLE.md).
+
 # Priorities
 
 Ranked from top to low.
