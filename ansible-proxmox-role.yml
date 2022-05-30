@@ -63,6 +63,11 @@
 - name: replace config
   command: "mv {{ lookup('env', 'HOME') }}/.kube/config.pk8stmp {{ lookup('env', 'HOME') }}/.kube/config"
   delegate_to: 127.0.0.1
+- name: fix config perms
+  file:
+    path: "{{ lookup('env', 'HOME') }}/.kube/config"
+    mode: "0600"
+  delegate_to: 127.0.0.1
 - name: switch context
   command: "kubectl config use-context kubernetes-admin@{{ inventory_hostname }}"
   delegate_to: 127.0.0.1
