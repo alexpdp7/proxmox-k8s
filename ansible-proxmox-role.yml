@@ -17,7 +17,7 @@
     remote_src: yes
   delegate_to: "{{ k8s_proxmox_host }}"
 - name: create vm
-  command: "qm create {{ proxmox_vmid }} -cdrom /var/lib/vz/template/iso/{{ inventory_hostname }}.iso -cores {{ proxmox_cores }} -memory {{ proxmox_memory_mb }} -name {{ inventory_hostname }} -onboot {{ proxmox_onboot }} -start -virtio0 local-zfs:32 -net0 virtio,bridge=vmbr0,firewall=1"
+  command: "qm create {{ proxmox_vmid }} -cdrom /var/lib/vz/template/iso/{{ inventory_hostname }}.iso -cores {{ proxmox_cores }} -memory {{ proxmox_memory_mb }} -name {{ inventory_hostname }} -onboot {{ proxmox_onboot }} -start -virtio0 {{ proxmox_storage_id }}:{{ proxmox_disk_size_gb }} -net0 virtio,bridge=vmbr0,firewall=1"
   delegate_to: "{{ k8s_proxmox_host }}"
 - name: wait until k8s config is available
   command: "ssh {{ inventory_hostname}} cat /home/core/.kube/config"

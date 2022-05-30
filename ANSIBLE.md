@@ -15,6 +15,8 @@ proxmox_cores: 4
 proxmox_memory_mb: 2048
 proxmox_onboot: <0 or 1>
 ansible_user: core
+proxmox_storage_id: local-zfs
+proxmox_disk_size_gb: 20
 ```
 
 You must disable facts gathering to run the role, because otherwise Ansible will try to connect to the host before it exists.
