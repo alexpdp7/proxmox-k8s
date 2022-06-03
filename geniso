@@ -63,6 +63,9 @@ storage:
 
           set -ue
 
+          # send a static DHCP client id so DHCP lease can persist if VM is recreated
+          nmcli con mod "Wired connection 1" ipv4.dhcp-client-id $HOSTNAME
+
           cat <<EOF > /etc/modules-load.d/crio.conf
           overlay
           br_netfilter

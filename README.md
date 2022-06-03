@@ -89,13 +89,15 @@ $ ssh core@<fqdn> cat .kube/config >~/.kube/config
 Apply the following dnsmasq configuration:
 
 ```
-dhcp-host=<hostname>,<ip>,<hostname>
+dhcp-host=id:<hostname>,<ip>,<hostname>
 server=/<k8s_domain>/<ip>#30053
 address=/<k8s_ingress_domain>/<ip>
 
 ```
 
 * The `dhcp-host` entry fixes the IP of the K8S host, because dnsmasq can only delegate domains to static IPs.
+  This uses the host name as a DHCP client-id, whereas Fedora CoreOS normally uses the MAC as the client-id.
+  This is done so if you recreate the VM from scratch and you get a new MAC, you still get the old ip.
 * Delegates the K8S domain to CoreDNS exposed as a NodePort.
 * Creates a "wildcard" DNS for Ingress.
 
