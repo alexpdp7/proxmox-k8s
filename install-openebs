@@ -5,3 +5,32 @@ set -ue
 kubectl apply -f https://openebs.github.io/charts/openebs-operator-lite.yaml
 kubectl apply -f https://openebs.github.io/charts/openebs-lite-sc.yaml
 kubectl patch storageclass openebs-hostpath -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+echo testing openebs
+
+echo creating pvc
+kubectl apply -f - <<EOF
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: local-hostpath-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5G
+EOF
+
+echo creating pod
+kubectl apply -f https://openebs.github.io/charts/examples/local-hostpath/local-hostpath-pod.yaml
+
+echo waiting for pvc to be bound
+while [[ $(kubectl get pvc local-hostpath-pvc -o 'jsonpath={..status.phase}') != "Bound" ]]; do echo "waiting for PVC to be bound" && sleep 1; done
+
+echo waiting for pod to be ready
+kubectl wait --for=condition=Ready pod/hello-local-hostpath-pod
+
+echo cleaning up
+kubectl delete pod/hello-local-hostpath-pod
+kubectl delete pvc/local-hostpath-pvc
