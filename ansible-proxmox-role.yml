@@ -86,18 +86,8 @@
     - { namespace: kube-system, name: kube-vip-ds }
   delegate_to: 127.0.0.1
 - name: install storage
-  command: "./k8s-iso/install-openebs"
+  command: "./k8s-iso/install-local-path-provisioner"
   delegate_to: 127.0.0.1
-- name: wait for openebs deployments
-  command: "kubectl wait deployment -n openebs  {{ item }} --for condition=Available --timeout=1000s"
-  loop:
-    - openebs-localpv-provisioner
-    - openebs-ndm-cluster-exporter
-    - openebs-ndm-operator
-  delegate_to: 127.0.0.1
-- name: wait for openebs daemonsets
-  command: "kubectl rollout status daemonset -n openebs {{ item }}"
-  loop:
-    - openebs-ndm
-    - openebs-ndm-node-exporter
+- name: wait for local-path-provisioner deployments
+  command: "kubectl wait deployment -n local-path-storage local-path-provisioner --for condition=Available --timeout=1000s"
   delegate_to: 127.0.0.1

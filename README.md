@@ -114,7 +114,7 @@ They will be exposed at `<subdomain>.<k8s_ingress_domain>`.
 ## Add storage
 
 ```
-$ ./install-openebs
+$ ./install-local-path-provisioner
 ```
 
 ## Reinstalling
