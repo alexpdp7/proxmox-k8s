@@ -276,6 +276,8 @@ storage:
           kubectl apply -f https://raw.githubusercontent.com/kube-vip/kube-vip-cloud-provider/main/manifest/kube-vip-cloud-controller.yaml
 
           kubectl create -f https://raw.githubusercontent.com/jcmoraisjr/haproxy-ingress/master/docs/haproxy-ingress.yaml
+          # make haproxy not require a pesky class
+          kubectl patch -n ingress-controller daemonset.apps haproxy-ingress --type=json -p '[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--watch-ingress-without-class"}]'
           kubectl label node --all role=ingress-controller
 
           mkdir -p /home/core/.kube/

@@ -106,7 +106,7 @@ Exposing a service using a LoadBalancer will make the service visible at `<servi
 Create ingresses like:
 
 ```
-$ kubectl -n <ns> create ingress <ingress_name> --annotation kubernetes.io/ingress.class=haproxy --rule="<subdomain>.<k8s_ingress_domain>/*=<service_name>:<port>,tls"
+$ kubectl -n <ns> create ingress <ingress_name> --rule="<subdomain>.<k8s_ingress_domain>/*=<service_name>:<port>,tls"
 ```
 
 They will be exposed at `<subdomain>.<k8s_ingress_domain>`.
