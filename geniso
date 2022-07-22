@@ -11,8 +11,8 @@ OUTPUT=$5
 ARCH="amd64"
 
 # Must match x.y.*
-KUBE_VERSION="1.23.6"
-CRIO_VERSION="1.23"
+KUBE_VERSION="1.24.3"
+CRIO_VERSION="1.24"
 
 # to perform updates, also review the kubevip commands below
 
@@ -139,9 +139,7 @@ storage:
 
           kubectl apply -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
 
-          # kubernetes 1.24 will require:
-          # kubectl taint nodes --all node-role.kubernetes.io/control-plane- node-role.kubernetes.io/master-
-          kubectl taint nodes --all node-role.kubernetes.io/master-
+          kubectl taint nodes --all node-role.kubernetes.io/control-plane- node-role.kubernetes.io/master-
 
           kubectl apply -f https://kube-vip.io/manifests/rbac.yaml
 
@@ -156,7 +154,7 @@ storage:
             creationTimestamp: null
             labels:
               app.kubernetes.io/name: kube-vip-ds
-              app.kubernetes.io/version: v0.4.4
+              app.kubernetes.io/version: v0.5.0
             name: kube-vip-ds
             namespace: kube-system
           spec:
@@ -168,7 +166,7 @@ storage:
                 creationTimestamp: null
                 labels:
                   app.kubernetes.io/name: kube-vip-ds
-                  app.kubernetes.io/version: v0.4.4
+                  app.kubernetes.io/version: v0.5.0
               spec:
                 containers:
                 - args:
@@ -183,7 +181,9 @@ storage:
                   - name: svc_enable
                     value: "true"
                   - name: vip_address
-                  image: ghcr.io/kube-vip/kube-vip:v0.4.4
+                  - name: prometheus_server
+                    value: :2112
+                  image: ghcr.io/kube-vip/kube-vip:v0.5.0
                   imagePullPolicy: Always
                   name: kube-vip
                   resources: {}
