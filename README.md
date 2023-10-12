@@ -1,3 +1,5 @@
+DEPRECATED: https://www.talos.dev/ is what I needed.
+
 # What?
 
 This is a simple and fast procedure to set up a single node Kubernetes cluster on "bare metal".
